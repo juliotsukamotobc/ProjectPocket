@@ -58,6 +58,10 @@ e acesse http://localhost:5500
 3. O fluxo `Deploy static site to GitHub Pages` habilita o Pages automaticamente na primeira execução.
    - Verifique em **Settings → Actions → General** se a opção **Workflow permissions** está como **Read and write**; isso garante que o GitHub Actions tenha permissão para criar o site do Pages.
    - Se preferir, confira em **Settings → Pages** que a opção **Build and deployment** está em **GitHub Actions**.
+   - Se preferir, confira em **Settings → Pages** que a opção **Build and deployment** está em **GitHub Actions**.
+3. (Opcional, mas recomendado) Ative o GitHub Pages:
+   - No GitHub, acesse **Settings → Pages** e, em **Build and deployment**, selecione **GitHub Actions**.
+   - Confirme o fluxo `Deploy static site to GitHub Pages` gerado neste repositório.
    - A cada push na branch `main` o site estático será publicado automaticamente.
 
 ## 📱 Empacotar com Capacitor (opcional)
