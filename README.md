@@ -55,6 +55,9 @@ e acesse http://localhost:5500
    git remote add origin https://github.com/<seu-usuario>/project-pocket.git
    git push -u origin main
    ```
+3. O fluxo `Deploy static site to GitHub Pages` habilita o Pages automaticamente na primeira execução.
+   - Se preferir, confira em **Settings → Pages** que a opção **Build and deployment** está em **GitHub Actions**.
+   - A cada push na branch `main` o site estático será publicado automaticamente.
 
 ## 📱 Empacotar com Capacitor (opcional)
 1) Inicialize Node (opcional, apenas se for usar Capacitor):
