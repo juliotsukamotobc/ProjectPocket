@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Project Pocket</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- MediaPipe Tasks Vision (Pose Landmarker) via CDN -->
+  <script type="module">
+    import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+    window.PP_Mediapipe = { FilesetResolver, PoseLandmarker };
+  </script>
+</head>
+<body>
+  <header>
+    <h1>Project Pocket</h1>
+    <p>Detecção e comparação de movimentos (Instrutor x Aluno)</p>
+  </header>
+
+  <main class="grid">
+    <section class="panel">
+      <div class="controls">
+        <button id="btnStartCam">Start Camera</button>
+        <label><input type="radio" name="role" value="instructor" checked> Instructor</label>
+        <label><input type="radio" name="role" value="student"> Student</label>
+        <button id="btnRecord">Record</button>
+        <button id="btnStop" disabled>Stop</button>
+        <button id="btnExport" disabled>Export JSON</button>
+        <input id="fileImport" type="file" accept="application/json" hidden />
+        <button id="btnImport">Load Instructor JSON</button>
+      </div>
+
+      <div class="sliders">
+        <label>Smoothing window (frames)
+          <input id="smoothWindow" type="range" min="1" max="15" step="1" value="5">
+        </label>
+        <label>Line width
+          <input id="lineWidth" type="range" min="1" max="8" step="1" value="3">
+        </label>
+      </div>
+
+      <div class="video-wrap">
+        <video id="video" playsinline></video>
+        <canvas id="overlay"></canvas>
+      </div>
+
+      <div class="legend">
+        <span class="dot instructor"></span> Instructor
+        <span class="dot student"></span> Student
+        <span class="dot diff"></span> Diff
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Status</h2>
+      <pre id="log"></pre>
+      <h2>Angles (deg)</h2>
+      <div id="angles"></div>
+    </section>
+  </main>
+
+  <footer>
+    <small>MIT © Project Pocket</small>
+  </footer>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

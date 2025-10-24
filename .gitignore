@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# capacitor / native
+android/
+ios/
+build/
+dist/
+www/
+
+# misc
+.DS_Store
+*.log
