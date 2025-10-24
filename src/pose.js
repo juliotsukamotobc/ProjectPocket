@@ -39,8 +39,16 @@ export function drawPose(ctx, landmarks, style = {}) {
   ctx.lineWidth = style.lineWidth || 3;
   ctx.strokeStyle = style.strokeStyle || "rgba(30,144,255,0.9)";
   ctx.fillStyle = style.fillStyle || "rgba(30,144,255,0.9)";
-  // Desenha pontos
-  for (const p of landmarks) {
+  // Desenha pontos (apenas corpo, sem rosto)
+  const bodyPointIndices = [
+    // tronco e membros superiores
+    11, 12, 13, 14, 15, 16,
+    // quadris e membros inferiores
+    23, 24, 25, 26, 27, 28
+  ];
+  for (const idx of bodyPointIndices) {
+    const p = landmarks[idx];
+    if (!p) continue;
     ctx.beginPath();
     ctx.arc(p.x * w, p.y * h, 3, 0, Math.PI * 2);
     ctx.fill();
@@ -56,9 +64,12 @@ export function drawPose(ctx, landmarks, style = {}) {
     'lAnkle': 27, 'rAnkle': 28
   };
   function line(a, b) {
+    const pa = landmarks[a];
+    const pb = landmarks[b];
+    if (!pa || !pb) return;
     ctx.beginPath();
-    ctx.moveTo(landmarks[a].x * w, landmarks[a].y * h);
-    ctx.lineTo(landmarks[b].x * w, landmarks[b].y * h);
+    ctx.moveTo(pa.x * w, pa.y * h);
+    ctx.lineTo(pb.x * w, pb.y * h);
     ctx.stroke();
   }
   ctx.beginPath();
