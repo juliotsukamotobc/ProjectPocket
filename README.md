@@ -55,6 +55,9 @@ e acesse http://localhost:5500
    git remote add origin https://github.com/<seu-usuario>/project-pocket.git
    git push -u origin main
    ```
+3. Antes do primeiro deploy, habilite o GitHub Pages manualmente em **Settings → Pages** e selecione **GitHub Actions** em **Build and deployment**.
+   - Em **Settings → Actions → General**, ajuste **Workflow permissions** para **Read and write**.
+   - Com essas permissões configuradas, o fluxo `Deploy static site to GitHub Pages` publica o site a cada push na branch `main`.
 
 ## 📱 Empacotar com Capacitor (opcional)
 1) Inicialize Node (opcional, apenas se for usar Capacitor):
