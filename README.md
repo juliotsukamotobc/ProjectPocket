@@ -58,6 +58,14 @@ e acesse http://localhost:5500
 3. Antes do primeiro deploy, habilite o GitHub Pages manualmente em **Settings → Pages** e selecione **GitHub Actions** em **Build and deployment**.
    - Em **Settings → Actions → General**, ajuste **Workflow permissions** para **Read and write**.
    - Com essas permissões configuradas, o fluxo `Deploy static site to GitHub Pages` publica o site a cada push na branch `main`.
+3. O fluxo `Deploy static site to GitHub Pages` habilita o Pages automaticamente na primeira execução.
+   - Verifique em **Settings → Actions → General** se a opção **Workflow permissions** está como **Read and write**; isso garante que o GitHub Actions tenha permissão para criar o site do Pages.
+   - Se preferir, confira em **Settings → Pages** que a opção **Build and deployment** está em **GitHub Actions**.
+   - Se preferir, confira em **Settings → Pages** que a opção **Build and deployment** está em **GitHub Actions**.
+3. (Opcional, mas recomendado) Ative o GitHub Pages:
+   - No GitHub, acesse **Settings → Pages** e, em **Build and deployment**, selecione **GitHub Actions**.
+   - Confirme o fluxo `Deploy static site to GitHub Pages` gerado neste repositório.
+   - A cada push na branch `main` o site estático será publicado automaticamente.
 
 ## 📱 Empacotar com Capacitor (opcional)
 1) Inicialize Node (opcional, apenas se for usar Capacitor):
