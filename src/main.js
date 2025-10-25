@@ -18,6 +18,8 @@ const lineWidth = document.getElementById('lineWidth');
 let role = "instructor";
 let running = false;
 let recording = false;
+let recordingStartTime = null;
+const RECORD_DURATION_MS = 4000;
 let instructorFrames = []; // array de landmarks do instrutor (para referência)
 let instructorAngles = []; // ângulos por frame (auxiliar)
 let poseEngine;
@@ -69,20 +71,32 @@ async function ensurePoseEngine() {
 // Recording
 btnRecord.addEventListener('click', ()=>{
   if (!running) { log('Start the camera first'); return; }
+  startRecording();
+});
+
+btnStop.addEventListener('click', ()=> stopRecording(true));
+
+function startRecording() {
   recording = true;
+  recordingStartTime = performance.now();
   instructorFrames = [];
   instructorAngles = [];
   btnStop.disabled = false;
+  btnRecord.disabled = true;
   btnExport.disabled = true;
-  log('Recording started');
-});
+  log(`Recording started (max ${RECORD_DURATION_MS / 1000}s)`);
+}
 
-btnStop.addEventListener('click', ()=>{
+function stopRecording(manual = false) {
+  if (!recording) return;
   recording = false;
+  recordingStartTime = null;
   btnStop.disabled = true;
+  btnRecord.disabled = false;
   btnExport.disabled = instructorFrames.length === 0;
-  log(`Recording stopped (${instructorFrames.length} frames)`);
-});
+  const reason = manual ? 'stopped manually' : 'completed automatically';
+  log(`Recording ${reason} (${instructorFrames.length} frames)`);
+}
 
 btnExport.addEventListener('click', ()=>{
   const payload = { frames: instructorFrames, angles: instructorAngles, fps: 30, createdAt: new Date().toISOString() };
@@ -128,6 +142,10 @@ function loop() {
   if (recording && role === "instructor" && landmarks) {
     instructorFrames.push(landmarks);
     instructorAngles.push(ang);
+  }
+
+  if (recording && recordingStartTime && (performance.now() - recordingStartTime) >= RECORD_DURATION_MS) {
+    stopRecording(false);
   }
 
   // simple diff display in log (if instructor exists and role == student)
