@@ -132,7 +132,7 @@ function startComparison() {
 }
   const reason = manual ? 'stopped manually' : 'completed automatically';
   log(`Recording ${reason} (${instructorFrames.length} frames)`);
-}
+
 
 btnExport.addEventListener('click', ()=>{
   const payload = { frames: instructorFrames, angles: instructorAngles, fps: 30, createdAt: new Date().toISOString() };
