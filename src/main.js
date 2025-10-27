@@ -11,6 +11,7 @@ const btnRecord = document.getElementById('btnRecord');
 const btnStop = document.getElementById('btnStop');
 const btnExport = document.getElementById('btnExport');
 const btnImport = document.getElementById('btnImport');
+const btnCompare = document.getElementById('btnCompare');
 const fileImport = document.getElementById('fileImport');
 const smoothWindow = document.getElementById('smoothWindow');
 const lineWidth = document.getElementById('lineWidth');
@@ -18,10 +19,18 @@ const lineWidth = document.getElementById('lineWidth');
 let role = "instructor";
 let running = false;
 let recording = false;
+let recordingStartTime = null;
+const RECORD_DURATION_MS = 4000;
 let instructorFrames = []; // array de landmarks do instrutor (para referência)
 let instructorAngles = []; // ângulos por frame (auxiliar)
 let poseEngine;
 let smoother = new MovingAverage(parseInt(smoothWindow.value,10));
+let compareActive = false;
+let compareStartTime = 0;
+let compareIndex = 0;
+const COMPARE_FPS = 30;
+
+btnCompare.disabled = true;
 
 // Role selector
 document.querySelectorAll('input[name="role"]').forEach(r=>{
@@ -69,20 +78,57 @@ async function ensurePoseEngine() {
 // Recording
 btnRecord.addEventListener('click', ()=>{
   if (!running) { log('Start the camera first'); return; }
-  recording = true;
-  instructorFrames = [];
-  instructorAngles = [];
-  btnStop.disabled = false;
-  btnExport.disabled = true;
-  log('Recording started');
+  startRecording();
 });
 
-btnStop.addEventListener('click', ()=>{
-  recording = false;
-  btnStop.disabled = true;
-  btnExport.disabled = instructorFrames.length === 0;
-  log(`Recording stopped (${instructorFrames.length} frames)`);
+btnStop.addEventListener('click', ()=> stopRecording(true));
+
+btnCompare.addEventListener('click', ()=>{
+  startComparison();
 });
+
+function startRecording() {
+  recording = true;
+  recordingStartTime = performance.now();
+  instructorFrames = [];
+  instructorAngles = [];
+  compareActive = false;
+  compareIndex = 0;
+  compareStartTime = 0;
+  btnStop.disabled = false;
+  btnRecord.disabled = true;
+  btnExport.disabled = true;
+  btnCompare.disabled = true;
+  log(`Recording started (max ${RECORD_DURATION_MS / 1000}s)`);
+}
+
+function stopRecording(manual = false) {
+  if (!recording) return;
+  recording = false;
+  recordingStartTime = null;
+  btnStop.disabled = true;
+  btnRecord.disabled = false;
+  btnExport.disabled = instructorFrames.length === 0;
+  btnCompare.disabled = instructorFrames.length === 0;
+  const reason = manual ? 'stopped manually' : 'completed automatically';
+  log(`Recording ${reason} (${instructorFrames.length} frames)`);
+}
+
+function startComparison() {
+  if (!running) {
+    log('Inicie a câmera antes de comparar.');
+    return;
+  }
+  if (instructorFrames.length === 0) {
+    log('Nenhuma gravação encontrada para comparar.');
+    return;
+  }
+  compareActive = true;
+  compareStartTime = performance.now();
+  compareIndex = 0;
+  ensureInstructorAngles();
+  log('Comparação iniciada usando a última gravação do instrutor.');
+}
 
 btnExport.addEventListener('click', ()=>{
   const payload = { frames: instructorFrames, angles: instructorAngles, fps: 30, createdAt: new Date().toISOString() };
@@ -99,6 +145,13 @@ fileImport.addEventListener('change', async (e)=>{
     if (!data.frames) throw new Error('Invalid file');
     instructorFrames = data.frames;
     instructorAngles = data.angles || [];
+    if (!Array.isArray(instructorAngles) || instructorAngles.length === 0) {
+      instructorAngles = instructorFrames.map(frame => computeAngles(frame));
+    }
+    compareActive = false;
+    compareIndex = 0;
+    compareStartTime = 0;
+    btnCompare.disabled = instructorFrames.length === 0;
     log(`Loaded instructor JSON: ${instructorFrames.length} frames`);
   } catch (err) {
     log('Invalid JSON: ' + err.message);
@@ -106,6 +159,46 @@ fileImport.addEventListener('change', async (e)=>{
     fileImport.value = '';
   }
 });
+
+function getInstructorFrameForDisplay() {
+  if (instructorFrames.length === 0) return null;
+  if (compareActive) {
+    return instructorFrames[compareIndex % instructorFrames.length];
+  }
+  return instructorFrames[0];
+}
+
+function ensureInstructorAngles() {
+  if (instructorFrames.length === 0) return;
+  if (!Array.isArray(instructorAngles) || instructorAngles.length !== instructorFrames.length) {
+    instructorAngles = instructorFrames.map(frame => computeAngles(frame));
+  }
+}
+
+function getInstructorAnglesForComparison() {
+  if (instructorFrames.length === 0) return null;
+  ensureInstructorAngles();
+  if (!Array.isArray(instructorAngles) || instructorAngles.length === 0) return null;
+  if (compareActive) {
+    return instructorAngles[compareIndex % instructorAngles.length];
+  }
+  return instructorAngles[0];
+}
+
+function advanceComparisonFrame() {
+  if (instructorFrames.length === 0) {
+    compareActive = false;
+    return;
+  }
+  const frameDuration = 1000 / COMPARE_FPS;
+  const elapsed = performance.now() - compareStartTime;
+  const frameCount = instructorFrames.length;
+  if (frameCount === 0 || frameDuration <= 0) {
+    compareIndex = 0;
+    return;
+  }
+  compareIndex = Math.floor(elapsed / frameDuration) % frameCount;
+}
 
 // Main loop
 function loop() {
@@ -116,9 +209,12 @@ function loop() {
   // draw
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawPose(ctx, landmarks, { lineWidth: parseInt(lineWidth.value,10), strokeStyle: "rgba(46,204,113,0.95)", fillStyle: "rgba(46,204,113,0.95)" });
-  // overlay instructor (first frame) for referência visual
-  if (instructorFrames.length > 0) {
-    drawPose(ctx, instructorFrames[0], { lineWidth: parseInt(lineWidth.value,10), strokeStyle: "rgba(30,144,255,0.9)", fillStyle: "rgba(30,144,255,0.9)" });
+  if (compareActive && instructorFrames.length > 0) {
+    advanceComparisonFrame();
+  }
+  const overlayFrame = getInstructorFrameForDisplay();
+  if (overlayFrame) {
+    drawPose(ctx, overlayFrame, { lineWidth: parseInt(lineWidth.value,10), strokeStyle: "rgba(30,144,255,0.9)", fillStyle: "rgba(30,144,255,0.9)" });
   }
 
   // angles + diff
@@ -130,15 +226,20 @@ function loop() {
     instructorAngles.push(ang);
   }
 
-  // simple diff display in log (if instructor exists and role == student)
-  if (role === "student" && instructorAngles.length > 0 && ang) {
-    // compara ângulos atuais com o primeiro frame do instrutor (ou o correspondente por índice futuro)
-    const ref = instructorAngles[Math.min(instructorAngles.length-1, 0)] || instructorAngles[0];
-    const keys = Object.keys(ang);
-    const diffs = keys.map(k => Math.abs((ang[k]||0) - (ref[k]||0)));
-    const avgDiff = diffs.reduce((a,b)=>a+b,0)/diffs.length;
-    if (avgDiff !== undefined) {
-      log(`Avg diff: ${avgDiff.toFixed(1)} deg`);
+  if (recording && recordingStartTime && (performance.now() - recordingStartTime) >= RECORD_DURATION_MS) {
+    stopRecording(false);
+  }
+
+  // diff display em loop quando comparação estiver ativa
+  if (compareActive && role === "student" && ang) {
+    const ref = getInstructorAnglesForComparison();
+    if (ref) {
+      const keys = Object.keys(ang);
+      const diffs = keys.map(k => Math.abs((ang[k]||0) - (ref[k]||0)));
+      const avgDiff = diffs.reduce((a,b)=>a+b,0)/diffs.length;
+      if (Number.isFinite(avgDiff)) {
+        log(`Avg diff (frame ${compareIndex + 1}/${instructorFrames.length}): ${avgDiff.toFixed(1)} deg`);
+      }
     }
   }
 
