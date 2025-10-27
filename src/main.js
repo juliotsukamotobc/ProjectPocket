@@ -87,6 +87,7 @@ btnCompare.addEventListener('click', ()=>{
   startComparison();
 });
 
+
 function startRecording() {
   recording = true;
   recordingStartTime = performance.now();
@@ -128,6 +129,9 @@ function startComparison() {
   compareIndex = 0;
   ensureInstructorAngles();
   log('Comparação iniciada usando a última gravação do instrutor.');
+}
+  const reason = manual ? 'stopped manually' : 'completed automatically';
+  log(`Recording ${reason} (${instructorFrames.length} frames)`);
 }
 
 btnExport.addEventListener('click', ()=>{
@@ -240,6 +244,15 @@ function loop() {
       if (Number.isFinite(avgDiff)) {
         log(`Avg diff (frame ${compareIndex + 1}/${instructorFrames.length}): ${avgDiff.toFixed(1)} deg`);
       }
+  // simple diff display in log (if instructor exists and role == student)
+  if (role === "student" && instructorAngles.length > 0 && ang) {
+    // compara ângulos atuais com o primeiro frame do instrutor (ou o correspondente por índice futuro)
+    const ref = instructorAngles[Math.min(instructorAngles.length-1, 0)] || instructorAngles[0];
+    const keys = Object.keys(ang);
+    const diffs = keys.map(k => Math.abs((ang[k]||0) - (ref[k]||0)));
+    const avgDiff = diffs.reduce((a,b)=>a+b,0)/diffs.length;
+    if (avgDiff !== undefined) {
+      log(`Avg diff: ${avgDiff.toFixed(1)} deg`);
     }
   }
 
