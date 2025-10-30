@@ -207,22 +207,14 @@ function loop() {
   const landmarks = smoother.push(landmarksRaw) || landmarksRaw;
 
   // draw
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawPose(ctx, landmarks, {
-    lineWidth: parseInt(lineWidth.value, 10),
-    strokeStyle: "rgba(46,204,113,0.95)",
-    fillStyle: "rgba(46,204,113,0.95)"
-  });
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawPose(ctx, landmarks, { lineWidth: parseInt(lineWidth.value,10), strokeStyle: "rgba(46,204,113,0.95)", fillStyle: "rgba(46,204,113,0.95)" });
   if (compareActive && instructorFrames.length > 0) {
     advanceComparisonFrame();
   }
   const overlayFrame = getInstructorFrameForDisplay();
   if (overlayFrame) {
-    drawPose(ctx, overlayFrame, {
-      lineWidth: parseInt(lineWidth.value, 10),
-      strokeStyle: "rgba(30,144,255,0.9)",
-      fillStyle: "rgba(30,144,255,0.9)"
-    });
+    drawPose(ctx, overlayFrame, { lineWidth: parseInt(lineWidth.value,10), strokeStyle: "rgba(30,144,255,0.9)", fillStyle: "rgba(30,144,255,0.9)" });
   }
 
   // angles + diff
