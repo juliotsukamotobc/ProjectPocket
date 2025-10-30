@@ -6,6 +6,7 @@ import { log, showAngles, downloadJSON } from './ui.js';
 const video = document.getElementById('video');
 const canvas = document.getElementById('overlay');
 const ctx = canvas.getContext('2d');
+const recordingTimer = document.getElementById('recordingTimer');
 const btnStartCam = document.getElementById('btnStartCam');
 const btnRecord = document.getElementById('btnRecord');
 const btnStop = document.getElementById('btnStop');
@@ -31,6 +32,29 @@ let compareIndex = 0;
 const COMPARE_FPS = 30;
 
 btnCompare.disabled = true;
+
+function formatDuration(ms) {
+  const clamped = Math.min(Math.max(ms, 0), RECORD_DURATION_MS);
+  return (clamped / 1000).toFixed(3).replace('.', ',') + ' s';
+}
+
+function showRecordingTimer(startValue = 0) {
+  if (!recordingTimer) return;
+  recordingTimer.classList.remove('hidden');
+  recordingTimer.textContent = formatDuration(startValue);
+}
+
+function hideRecordingTimer() {
+  if (!recordingTimer) return;
+  recordingTimer.classList.add('hidden');
+  recordingTimer.textContent = formatDuration(0);
+}
+
+function updateRecordingTimer(now) {
+  if (!recordingTimer || !recording || !recordingStartTime) return;
+  const elapsed = Math.min(now - recordingStartTime, RECORD_DURATION_MS);
+  recordingTimer.textContent = formatDuration(elapsed);
+}
 
 // Role selector
 document.querySelectorAll('input[name="role"]').forEach(r=>{
@@ -99,6 +123,7 @@ function startRecording() {
   btnRecord.disabled = true;
   btnExport.disabled = true;
   btnCompare.disabled = true;
+  showRecordingTimer(0);
   log(`Gravação iniciada (máx ${RECORD_DURATION_MS / 1000}s)`);
 }
 
@@ -110,6 +135,7 @@ function stopRecording(manual = false) {
   btnRecord.disabled = false;
   btnExport.disabled = instructorFrames.length === 0;
   btnCompare.disabled = instructorFrames.length === 0;
+  hideRecordingTimer();
   const reason = manual ? 'interrompida manualmente' : 'finalizada automaticamente';
   log(`Gravação ${reason} (${instructorFrames.length} quadros)`);
 }
@@ -205,6 +231,7 @@ function loop() {
   if (!running) return;
   const landmarksRaw = poseEngine.detect(video);
   const landmarks = smoother.push(landmarksRaw) || landmarksRaw;
+  const now = performance.now();
 
   // draw
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -234,7 +261,11 @@ function loop() {
     instructorAngles.push(ang);
   }
 
-  if (recording && recordingStartTime && (performance.now() - recordingStartTime) >= RECORD_DURATION_MS) {
+  if (recording && recordingStartTime) {
+    updateRecordingTimer(now);
+  }
+
+  if (recording && recordingStartTime && (now - recordingStartTime) >= RECORD_DURATION_MS) {
     stopRecording(false);
   }
 
