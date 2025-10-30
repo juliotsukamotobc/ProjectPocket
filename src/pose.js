@@ -39,14 +39,16 @@ export function drawPose(ctx, landmarks, style = {}) {
   ctx.lineWidth = style.lineWidth || 3;
   ctx.strokeStyle = style.strokeStyle || "rgba(30,144,255,0.9)";
   ctx.fillStyle = style.fillStyle || "rgba(30,144,255,0.9)";
-  // Desenha pontos (apenas corpo, sem rosto)
-  const bodyPointIndices = [
+  // Desenha pontos principais do corpo e das mãos
+  const pointIndices = [
     // tronco e membros superiores
     11, 12, 13, 14, 15, 16,
+    // mãos
+    17, 18, 19, 20, 21, 22,
     // quadris e membros inferiores
     23, 24, 25, 26, 27, 28
   ];
-  for (const idx of bodyPointIndices) {
+  for (const idx of pointIndices) {
     const p = landmarks[idx];
     if (!p) continue;
     ctx.beginPath();
@@ -59,6 +61,9 @@ export function drawPose(ctx, landmarks, style = {}) {
     'lShoulder': 11, 'rShoulder': 12,
     'lElbow': 13, 'rElbow': 14,
     'lWrist': 15, 'rWrist': 16,
+    'lPinky': 17, 'rPinky': 18,
+    'lIndex': 19, 'rIndex': 20,
+    'lThumb': 21, 'rThumb': 22,
     'lHip': 23, 'rHip': 24,
     'lKnee': 25, 'rKnee': 26,
     'lAnkle': 27, 'rAnkle': 28
@@ -91,6 +96,18 @@ export function drawPose(ctx, landmarks, style = {}) {
   line(idx.lHip, idx.rHip);
   line(idx.lShoulder, idx.lHip);
   line(idx.rShoulder, idx.rHip);
+  // Mãos esquerdas
+  line(idx.lWrist, idx.lPinky);
+  line(idx.lWrist, idx.lIndex);
+  line(idx.lWrist, idx.lThumb);
+  line(idx.lPinky, idx.lIndex);
+  line(idx.lIndex, idx.lThumb);
+  // Mãos direitas
+  line(idx.rWrist, idx.rPinky);
+  line(idx.rWrist, idx.rIndex);
+  line(idx.rWrist, idx.rThumb);
+  line(idx.rPinky, idx.rIndex);
+  line(idx.rIndex, idx.rThumb);
   ctx.restore();
 }
 
