@@ -53,10 +53,10 @@ btnStartCam.addEventListener('click', async ()=>{
     resizeCanvas();
     running = true;
     requestAnimationFrame(loop);
-    log('Camera started');
+    log('Câmera iniciada');
   } catch (e) {
     console.error(e);
-    log('Camera error: ' + e.message);
+    log('Erro da câmera: ' + e.message);
   }
 });
 
@@ -71,13 +71,13 @@ async function ensurePoseEngine() {
   if (!poseEngine) {
     poseEngine = new PoseEngine();
     await poseEngine.init();
-    log('Pose engine ready');
+    log('Processador de pose pronto');
   }
 }
 
 // Recording
 btnRecord.addEventListener('click', ()=>{
-  if (!running) { log('Start the camera first'); return; }
+  if (!running) { log('Inicie a câmera primeiro'); return; }
   startRecording();
 });
 
@@ -99,7 +99,7 @@ function startRecording() {
   btnRecord.disabled = true;
   btnExport.disabled = true;
   btnCompare.disabled = true;
-  log(`Recording started (max ${RECORD_DURATION_MS / 1000}s)`);
+  log(`Gravação iniciada (máx ${RECORD_DURATION_MS / 1000}s)`);
 }
 
 function stopRecording(manual = false) {
@@ -110,8 +110,8 @@ function stopRecording(manual = false) {
   btnRecord.disabled = false;
   btnExport.disabled = instructorFrames.length === 0;
   btnCompare.disabled = instructorFrames.length === 0;
-  const reason = manual ? 'stopped manually' : 'completed automatically';
-  log(`Recording ${reason} (${instructorFrames.length} frames)`);
+  const reason = manual ? 'interrompida manualmente' : 'finalizada automaticamente';
+  log(`Gravação ${reason} (${instructorFrames.length} quadros)`);
 }
 
 function startComparison() {
@@ -142,7 +142,7 @@ fileImport.addEventListener('change', async (e)=>{
   const text = await file.text();
   try {
     const data = JSON.parse(text);
-    if (!data.frames) throw new Error('Invalid file');
+    if (!data.frames) throw new Error('Arquivo inválido');
     instructorFrames = data.frames;
     instructorAngles = data.angles || [];
     if (!Array.isArray(instructorAngles) || instructorAngles.length === 0) {
@@ -152,9 +152,9 @@ fileImport.addEventListener('change', async (e)=>{
     compareIndex = 0;
     compareStartTime = 0;
     btnCompare.disabled = instructorFrames.length === 0;
-    log(`Loaded instructor JSON: ${instructorFrames.length} frames`);
+    log(`JSON do instrutor carregado: ${instructorFrames.length} quadros`);
   } catch (err) {
-    log('Invalid JSON: ' + err.message);
+    log('JSON inválido: ' + err.message);
   } finally {
     fileImport.value = '';
   }
@@ -207,14 +207,22 @@ function loop() {
   const landmarks = smoother.push(landmarksRaw) || landmarksRaw;
 
   // draw
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawPose(ctx, landmarks, { lineWidth: parseInt(lineWidth.value,10), strokeStyle: "rgba(46,204,113,0.95)", fillStyle: "rgba(46,204,113,0.95)" });
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawPose(ctx, landmarks, {
+    lineWidth: parseInt(lineWidth.value, 10),
+    strokeStyle: "rgba(46,204,113,0.95)",
+    fillStyle: "rgba(46,204,113,0.95)"
+  });
   if (compareActive && instructorFrames.length > 0) {
     advanceComparisonFrame();
   }
   const overlayFrame = getInstructorFrameForDisplay();
   if (overlayFrame) {
-    drawPose(ctx, overlayFrame, { lineWidth: parseInt(lineWidth.value,10), strokeStyle: "rgba(30,144,255,0.9)", fillStyle: "rgba(30,144,255,0.9)" });
+    drawPose(ctx, overlayFrame, {
+      lineWidth: parseInt(lineWidth.value, 10),
+      strokeStyle: "rgba(30,144,255,0.9)",
+      fillStyle: "rgba(30,144,255,0.9)"
+    });
   }
 
   // angles + diff
@@ -238,7 +246,7 @@ function loop() {
       const diffs = keys.map(k => Math.abs((ang[k]||0) - (ref[k]||0)));
       const avgDiff = diffs.reduce((a,b)=>a+b,0)/diffs.length;
       if (Number.isFinite(avgDiff)) {
-        log(`Avg diff (frame ${compareIndex + 1}/${instructorFrames.length}): ${avgDiff.toFixed(1)} deg`);
+        log(`Diferença média (quadro ${compareIndex + 1}/${instructorFrames.length}): ${avgDiff.toFixed(1)}°`);
       }
     }
   }
