@@ -20,21 +20,22 @@
   <main class="grid">
     <section class="panel">
       <div class="controls">
-        <button id="btnStartCam">Start Camera</button>
-        <label><input type="radio" name="role" value="instructor" checked> Instructor</label>
-        <label><input type="radio" name="role" value="student"> Student</label>
-        <button id="btnRecord">Record</button>
-        <button id="btnStop" disabled>Stop</button>
-        <button id="btnExport" disabled>Export JSON</button>
+        <button id="btnStartCam">Iniciar câmera</button>
+        <label><input type="radio" name="role" value="instructor" checked> Instrutor</label>
+        <label><input type="radio" name="role" value="student"> Aluno</label>
+        <button id="btnRecord">Gravar</button>
+        <button id="btnStop" disabled>Parar</button>
+        <button id="btnExport" disabled>Exportar JSON</button>
         <input id="fileImport" type="file" accept="application/json" hidden />
-        <button id="btnImport">Load Instructor JSON</button>
+        <button id="btnImport">Carregar JSON do instrutor</button>
+        <button id="btnCompare" disabled>Iniciar comparação</button>
       </div>
 
       <div class="sliders">
-        <label>Smoothing window (frames)
+        <label>Janela de suavização (quadros)
           <input id="smoothWindow" type="range" min="1" max="15" step="1" value="5">
         </label>
-        <label>Line width
+        <label>Espessura da linha
           <input id="lineWidth" type="range" min="1" max="8" step="1" value="3">
         </label>
       </div>
@@ -45,16 +46,16 @@
       </div>
 
       <div class="legend">
-        <span class="dot instructor"></span> Instructor
-        <span class="dot student"></span> Student
-        <span class="dot diff"></span> Diff
+        <span class="dot instructor"></span> Instrutor
+        <span class="dot student"></span> Aluno
+        <span class="dot diff"></span> Diferença
       </div>
     </section>
 
     <section class="panel">
       <h2>Status</h2>
       <pre id="log"></pre>
-      <h2>Angles (deg)</h2>
+      <h2>Ângulos (graus)</h2>
       <div id="angles"></div>
     </section>
   </main>
