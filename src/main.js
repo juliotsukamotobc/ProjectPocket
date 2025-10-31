@@ -19,6 +19,38 @@ const fileImport = document.getElementById('fileImport');
 const smoothWindow = document.getElementById('smoothWindow');
 const lineWidth = document.getElementById('lineWidth');
 
+function poseThickness() {
+  const raw = parseInt(lineWidth.value, 10);
+  if (!Number.isFinite(raw)) return 6;
+  return Math.max(3, Math.round(raw * 1.6));
+}
+
+function poseStyle(base) {
+  const thickness = poseThickness();
+  if (base === 'overlay') {
+    return {
+      thickness: Math.max(2, thickness - 1),
+      colors: {
+        start: 'rgba(52,152,219,0.95)',
+        end: 'rgba(52,152,219,0.25)',
+        glow: 'rgba(52,152,219,0.45)',
+        jointHalo: 'rgba(52,152,219,0.35)',
+        jointCore: '#f0f6ff'
+      }
+    };
+  }
+  return {
+    thickness,
+    colors: {
+      start: 'rgba(46,204,113,0.95)',
+      end: 'rgba(46,204,113,0.25)',
+      glow: 'rgba(46,204,113,0.55)',
+      jointHalo: 'rgba(46,204,113,0.4)',
+      jointCore: '#f6fff9'
+    }
+  };
+}
+
 let role = "instructor";
 let running = false;
 let recording = false;
@@ -287,21 +319,13 @@ function loop() {
 
   // draw
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawPose(ctx, landmarks, {
-    lineWidth: parseInt(lineWidth.value, 10),
-    strokeStyle: "rgba(46,204,113,0.95)",
-    fillStyle: "rgba(46,204,113,0.95)"
-  });
+  drawPose(ctx, landmarks, poseStyle('active'));
   if (compareActive && instructorFrames.length > 0) {
     advanceComparisonFrame();
   }
   const overlayFrame = getInstructorFrameForDisplay();
   if (overlayFrame) {
-    drawPose(ctx, overlayFrame, {
-      lineWidth: parseInt(lineWidth.value, 10),
-      strokeStyle: "rgba(30,144,255,0.9)",
-      fillStyle: "rgba(30,144,255,0.9)"
-    });
+    drawPose(ctx, overlayFrame, poseStyle('overlay'));
   }
 
   // angles + diff
