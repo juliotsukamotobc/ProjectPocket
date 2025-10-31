@@ -112,6 +112,7 @@ function stopCamera() {
   video.srcObject = null;
   running = false;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  smoother.reset();
   stopRecording(true);
   stopComparison(true);
   btnStartCam.disabled = false;
