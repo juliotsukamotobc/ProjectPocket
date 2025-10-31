@@ -14,6 +14,7 @@ const btnExport = document.getElementById('btnExport');
 const btnImport = document.getElementById('btnImport');
 const btnCompare = document.getElementById('btnCompare');
 const btnStopCompare = document.getElementById('btnStopCompare');
+const btnStopCam = document.getElementById('btnStopCam');
 const fileImport = document.getElementById('fileImport');
 const smoothWindow = document.getElementById('smoothWindow');
 const lineWidth = document.getElementById('lineWidth');
@@ -85,12 +86,39 @@ btnStartCam.addEventListener('click', async ()=>{
     resizeCanvas();
     running = true;
     requestAnimationFrame(loop);
+    btnStartCam.disabled = true;
+    if (btnStopCam) btnStopCam.disabled = false;
     log('Câmera iniciada');
   } catch (e) {
     console.error(e);
     log('Erro da câmera: ' + e.message);
   }
 });
+
+if (btnStopCam) {
+  btnStopCam.addEventListener('click', ()=>{
+    stopCamera();
+  });
+}
+
+function stopCamera() {
+  if (!running && !video.srcObject) {
+    return;
+  }
+  const stream = video.srcObject;
+  if (stream && typeof stream.getTracks === 'function') {
+    stream.getTracks().forEach(track => track.stop());
+  }
+  video.srcObject = null;
+  running = false;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  smoother.reset();
+  stopRecording(true);
+  stopComparison(true);
+  btnStartCam.disabled = false;
+  if (btnStopCam) btnStopCam.disabled = true;
+  log('Câmera parada');
+}
 
 window.addEventListener('resize', resizeCanvas);
 function resizeCanvas() {
