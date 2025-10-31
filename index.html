@@ -12,15 +12,11 @@
   </script>
 </head>
 <body>
-  <header>
-    <h1>Project Pocket</h1>
-    <p>Detecção e comparação de movimentos (Instrutor x Aluno)</p>
-  </header>
-
   <main class="grid">
     <section class="panel">
       <div class="controls">
         <button id="btnStartCam">Iniciar câmera</button>
+        <button id="btnStopCam" disabled>Parar câmera</button>
         <label><input type="radio" name="role" value="instructor" checked> Instrutor</label>
         <label><input type="radio" name="role" value="student"> Aluno</label>
         <button id="btnRecord">Gravar</button>
@@ -53,7 +49,7 @@
       <div class="legend">
         <span class="dot instructor"></span> Instrutor
         <span class="dot student"></span> Aluno
-        <span class="dot diff"></span> Diferença
+        <span class="dot diff"></span> Diferença (halos vermelhos)
       </div>
     </section>
 
