@@ -334,7 +334,7 @@ function loop() {
   }
 
   let currentDiffs = null;
-  if (compareActive && role === "student" && ang) {
+  if (compareActive && ang) {
     const refAngles = getInstructorAnglesForComparison();
     if (refAngles) {
       currentDiffs = {};
