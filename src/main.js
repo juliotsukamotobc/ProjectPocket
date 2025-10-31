@@ -1,5 +1,5 @@
 // main.js - app glue
-import { PoseEngine, drawPose, computeAngles } from './pose.js';
+import { PoseEngine, drawPose, computeAngles, drawAngleDifferences } from './pose.js';
 import { MovingAverage } from './smoothing.js';
 import { log, showAngles, downloadJSON } from './ui.js';
 
@@ -64,6 +64,7 @@ let compareActive = false;
 let compareStartTime = 0;
 let compareIndex = 0;
 const COMPARE_FPS = 30;
+let lastDiffLogTime = 0;
 
 btnCompare.disabled = true;
 btnStopCompare.disabled = true;
@@ -224,6 +225,7 @@ function startComparison() {
   compareActive = true;
   compareStartTime = performance.now();
   compareIndex = 0;
+  lastDiffLogTime = 0;
   ensureInstructorAngles();
   log('Comparação iniciada usando a última gravação do instrutor.');
   updateComparisonButtons();
@@ -234,6 +236,7 @@ function stopComparison(manual = false) {
   compareActive = false;
   compareIndex = 0;
   compareStartTime = 0;
+  lastDiffLogTime = 0;
   if (manual) {
     log('Comparação parada.');
   }
@@ -317,6 +320,8 @@ function loop() {
   const landmarks = smoother.push(landmarksRaw) || landmarksRaw;
   const now = performance.now();
 
+  const ang = computeAngles(landmarks);
+
   // draw
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawPose(ctx, landmarks, poseStyle('active'));
@@ -328,8 +333,34 @@ function loop() {
     drawPose(ctx, overlayFrame, poseStyle('overlay'));
   }
 
+  let currentDiffs = null;
+  if (compareActive && role === "student" && ang) {
+    const refAngles = getInstructorAnglesForComparison();
+    if (refAngles) {
+      currentDiffs = {};
+      const keys = new Set([...Object.keys(refAngles || {}), ...Object.keys(ang || {})]);
+      for (const key of keys) {
+        const refValue = refAngles[key];
+        const studentValue = ang[key];
+        if (Number.isFinite(refValue) && Number.isFinite(studentValue)) {
+          currentDiffs[key] = studentValue - refValue;
+        }
+      }
+      if (Object.keys(currentDiffs).length === 0) {
+        currentDiffs = null;
+      }
+    }
+  }
+
+  if (currentDiffs) {
+    drawAngleDifferences(ctx, landmarks, currentDiffs, {
+      minVisibleDiff: 4,
+      maxDiff: 70,
+      showLabels: true
+    });
+  }
+
   // angles + diff
-  const ang = computeAngles(landmarks);
   showAngles(ang);
 
   if (recording && role === "instructor" && landmarks) {
@@ -347,13 +378,17 @@ function loop() {
 
   // diff display em loop quando comparação estiver ativa
   if (compareActive && role === "student" && ang) {
-    const ref = getInstructorAnglesForComparison();
-    if (ref) {
-      const keys = Object.keys(ang);
-      const diffs = keys.map(k => Math.abs((ang[k]||0) - (ref[k]||0)));
-      const avgDiff = diffs.reduce((a,b)=>a+b,0)/diffs.length;
+    const diffValues = currentDiffs
+      ? Object.values(currentDiffs).map(v => Math.abs(v)).filter(Number.isFinite)
+      : null;
+    if (diffValues && diffValues.length > 0) {
+      const avgDiff = diffValues.reduce((a, b) => a + b, 0) / diffValues.length;
       if (Number.isFinite(avgDiff)) {
-        log(`Diferença média (quadro ${compareIndex + 1}/${instructorFrames.length}): ${avgDiff.toFixed(1)}°`);
+        const nowTs = performance.now();
+        if (nowTs - lastDiffLogTime > 750) {
+          log(`Diferença média (quadro ${compareIndex + 1}/${instructorFrames.length}): ${avgDiff.toFixed(1)}°`);
+          lastDiffLogTime = nowTs;
+        }
       }
     }
   }

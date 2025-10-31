@@ -142,6 +142,107 @@ export function drawPose(ctx, landmarks, style = {}) {
   ctx.restore();
 }
 
+export function drawAngleDifferences(ctx, landmarks, angleDiffs, options = {}) {
+  if (!ctx || !landmarks || !angleDiffs) return;
+
+  const mapping = {
+    leftElbow: 13,
+    rightElbow: 14,
+    leftKnee: 25,
+    rightKnee: 26,
+    leftShoulder: 11,
+    rightShoulder: 12,
+    leftHip: 23,
+    rightHip: 24
+  };
+
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  const minVisibleDiff = options.minVisibleDiff ?? 5;
+  const maxDiff = options.maxDiff ?? 60;
+  const minRadius = options.minRadius ?? 24;
+  const maxRadius = options.maxRadius ?? 80;
+  const ringWidth = options.ringWidth ?? 3;
+  const baseRgb = options.baseRgb ?? '231,76,60';
+  const showLabels = options.showLabels ?? true;
+  const fontSize = options.fontSize ?? 12;
+  const labelPaddingX = options.labelPaddingX ?? 6;
+  const labelPaddingY = options.labelPaddingY ?? 4;
+  const maxAlpha = options.maxAlpha ?? 0.82;
+
+  ctx.save();
+  ctx.lineWidth = ringWidth;
+  ctx.font = `${options.fontWeight ?? 600} ${fontSize}px "Inter", "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (const [key, idx] of Object.entries(mapping)) {
+    const diff = angleDiffs[key];
+    if (!Number.isFinite(diff)) continue;
+    const magnitude = Math.abs(diff);
+    if (magnitude < minVisibleDiff) continue;
+
+    const landmark = landmarks[idx];
+    if (!landmark) continue;
+    const x = landmark.x * w;
+    const y = landmark.y * h;
+
+    const t = Math.min(magnitude / maxDiff, 1);
+    const radius = minRadius + (maxRadius - minRadius) * t;
+    const innerAlpha = Math.min(0.28 + 0.42 * t, maxAlpha);
+    const midAlpha = Math.min(0.18 + 0.36 * t, maxAlpha);
+
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    gradient.addColorStop(0, `rgba(${baseRgb},${innerAlpha})`);
+    gradient.addColorStop(0.65, `rgba(${baseRgb},${midAlpha})`);
+    gradient.addColorStop(1, `rgba(${baseRgb},0)`);
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(${baseRgb},${0.25 + 0.5 * t})`;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (showLabels) {
+      const label = `${Math.round(magnitude)}°`;
+      const labelWidth = ctx.measureText(label).width + labelPaddingX * 2;
+      const labelHeight = fontSize + labelPaddingY * 2;
+      const labelOffset = radius + labelHeight + 6;
+      const labelCenterY = Math.max(labelHeight / 2 + 4, y - labelOffset);
+      const rectX = x - labelWidth / 2;
+      const rectY = labelCenterY - labelHeight / 2;
+      const radiusRect = Math.min(10, labelHeight / 2);
+
+      ctx.fillStyle = `rgba(${baseRgb},0.9)`;
+      drawRoundedRectPath(ctx, rectX, rectY, labelWidth, labelHeight, radiusRect);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(label, x, labelCenterY);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawRoundedRectPath(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
 export function angle3(a, b, c) {
   // ângulo ABC (em graus) dado três pontos no plano normalizado (x,y)
   function v(from, to) { return { x: to.x - from.x, y: to.y - from.y }; }
