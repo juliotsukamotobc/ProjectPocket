@@ -13,6 +13,7 @@ const btnStop = document.getElementById('btnStop');
 const btnExport = document.getElementById('btnExport');
 const btnImport = document.getElementById('btnImport');
 const btnCompare = document.getElementById('btnCompare');
+const btnStopCompare = document.getElementById('btnStopCompare');
 const fileImport = document.getElementById('fileImport');
 const smoothWindow = document.getElementById('smoothWindow');
 const lineWidth = document.getElementById('lineWidth');
@@ -32,6 +33,13 @@ let compareIndex = 0;
 const COMPARE_FPS = 30;
 
 btnCompare.disabled = true;
+btnStopCompare.disabled = true;
+
+function updateComparisonButtons() {
+  const hasData = instructorFrames.length > 0;
+  btnCompare.disabled = !hasData || compareActive;
+  btnStopCompare.disabled = !compareActive;
+}
 
 function formatDuration(ms) {
   const clamped = Math.min(Math.max(ms, 0), RECORD_DURATION_MS);
@@ -111,6 +119,10 @@ btnCompare.addEventListener('click', ()=>{
   startComparison();
 });
 
+btnStopCompare.addEventListener('click', ()=>{
+  stopComparison(true);
+});
+
 function startRecording() {
   recording = true;
   recordingStartTime = performance.now();
@@ -122,8 +134,8 @@ function startRecording() {
   btnStop.disabled = false;
   btnRecord.disabled = true;
   btnExport.disabled = true;
-  btnCompare.disabled = true;
   showRecordingTimer(0);
+  updateComparisonButtons();
   log(`Gravação iniciada (máx ${RECORD_DURATION_MS / 1000}s)`);
 }
 
@@ -134,10 +146,10 @@ function stopRecording(manual = false) {
   btnStop.disabled = true;
   btnRecord.disabled = false;
   btnExport.disabled = instructorFrames.length === 0;
-  btnCompare.disabled = instructorFrames.length === 0;
   hideRecordingTimer();
   const reason = manual ? 'interrompida manualmente' : 'finalizada automaticamente';
   log(`Gravação ${reason} (${instructorFrames.length} quadros)`);
+  updateComparisonButtons();
 }
 
 function startComparison() {
@@ -154,6 +166,18 @@ function startComparison() {
   compareIndex = 0;
   ensureInstructorAngles();
   log('Comparação iniciada usando a última gravação do instrutor.');
+  updateComparisonButtons();
+}
+
+function stopComparison(manual = false) {
+  if (!compareActive) return;
+  compareActive = false;
+  compareIndex = 0;
+  compareStartTime = 0;
+  if (manual) {
+    log('Comparação parada.');
+  }
+  updateComparisonButtons();
 }
 
 btnExport.addEventListener('click', ()=>{
@@ -177,13 +201,13 @@ fileImport.addEventListener('change', async (e)=>{
     compareActive = false;
     compareIndex = 0;
     compareStartTime = 0;
-    btnCompare.disabled = instructorFrames.length === 0;
     log(`JSON do instrutor carregado: ${instructorFrames.length} quadros`);
   } catch (err) {
     log('JSON inválido: ' + err.message);
   } finally {
     fileImport.value = '';
   }
+  updateComparisonButtons();
 });
 
 function getInstructorFrameForDisplay() {
