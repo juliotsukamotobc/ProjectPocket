@@ -34,80 +34,111 @@ export class PoseEngine {
 
 export function drawPose(ctx, landmarks, style = {}) {
   if (!landmarks) return;
-  const w = ctx.canvas.width, h = ctx.canvas.height;
-  ctx.save();
-  ctx.lineWidth = style.lineWidth || 3;
-  ctx.strokeStyle = style.strokeStyle || "rgba(30,144,255,0.9)";
-  ctx.fillStyle = style.fillStyle || "rgba(30,144,255,0.9)";
-  // Desenha pontos principais do corpo e das mãos
-  const pointIndices = [
-    // tronco e membros superiores
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+
+  const baseThickness = Math.max(1, style.thickness ?? style.lineWidth ?? 6);
+  const colors = {
+    start: "rgba(30,144,255,0.9)",
+    end: "rgba(30,144,255,0.25)",
+    glow: "rgba(30,144,255,0.5)",
+    jointHalo: "rgba(30,144,255,0.45)",
+    jointCore: "#ffffff",
+    ...(style.colors || {})
+  };
+  const jointRadius = Math.max(2, style.jointRadius ?? baseThickness * 1.4);
+  const jointCoreRadius = Math.max(1.5, style.jointCoreRadius ?? jointRadius * 0.55);
+
+  const bones = [
+    [11, 13], [13, 15],
+    [12, 14], [14, 16],
+    [23, 25], [25, 27],
+    [24, 26], [26, 28],
+    [11, 12], [23, 24],
+    [11, 23], [12, 24],
+    [15, 17], [15, 19], [15, 21], [17, 19], [19, 21],
+    [16, 18], [16, 20], [16, 22], [18, 20], [20, 22]
+  ];
+
+  const joints = [
     11, 12, 13, 14, 15, 16,
-    // mãos
     17, 18, 19, 20, 21, 22,
-    // quadris e membros inferiores
     23, 24, 25, 26, 27, 28
   ];
-  for (const idx of pointIndices) {
-    const p = landmarks[idx];
-    if (!p) continue;
-    ctx.beginPath();
-    ctx.arc(p.x * w, p.y * h, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Desenha alguns segmentos principais (ombro->cotovelo->punho etc.)
-  const idx = {
-    // MediaPipe indices
-    'lShoulder': 11, 'rShoulder': 12,
-    'lElbow': 13, 'rElbow': 14,
-    'lWrist': 15, 'rWrist': 16,
-    'lPinky': 17, 'rPinky': 18,
-    'lIndex': 19, 'rIndex': 20,
-    'lThumb': 21, 'rThumb': 22,
-    'lHip': 23, 'rHip': 24,
-    'lKnee': 25, 'rKnee': 26,
-    'lAnkle': 27, 'rAnkle': 28
-  };
-  function line(a, b) {
-    const pa = landmarks[a];
-    const pb = landmarks[b];
+
+  function drawBoneCapsule(aIdx, bIdx) {
+    const pa = landmarks[aIdx];
+    const pb = landmarks[bIdx];
     if (!pa || !pb) return;
+    const ax = pa.x * w;
+    const ay = pa.y * h;
+    const bx = pb.x * w;
+    const by = pb.y * h;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    if (!Number.isFinite(len) || len < 1e-3) return;
+
+    ctx.save();
+    ctx.translate(ax, ay);
+    ctx.rotate(Math.atan2(dy, dx));
+
+    const grad = ctx.createLinearGradient(0, 0, len, 0);
+    grad.addColorStop(0, colors.start);
+    grad.addColorStop(1, colors.end);
+
+    ctx.fillStyle = grad;
+    ctx.shadowColor = colors.glow;
+    ctx.shadowBlur = baseThickness * 1.25;
+
+    const r = baseThickness / 2;
     ctx.beginPath();
-    ctx.moveTo(pa.x * w, pa.y * h);
-    ctx.lineTo(pb.x * w, pb.y * h);
-    ctx.stroke();
+    ctx.moveTo(0, -r);
+    ctx.lineTo(len, -r);
+    ctx.arc(len, 0, r, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(0, r);
+    ctx.arc(0, 0, r, Math.PI / 2, (3 * Math.PI) / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
-  ctx.beginPath();
-  ctx.strokeStyle = style.strokeStyle || "rgba(30,144,255,0.9)";
-  // Braço esquerdo
-  line(idx.lShoulder, idx.lElbow);
-  line(idx.lElbow, idx.lWrist);
-  // Braço direito
-  line(idx.rShoulder, idx.rElbow);
-  line(idx.rElbow, idx.rWrist);
-  // Perna esquerda
-  line(idx.lHip, idx.lKnee);
-  line(idx.lKnee, idx.lAnkle);
-  // Perna direita
-  line(idx.rHip, idx.rKnee);
-  line(idx.rKnee, idx.rAnkle);
-  // Tronco
-  line(idx.lShoulder, idx.rShoulder);
-  line(idx.lHip, idx.rHip);
-  line(idx.lShoulder, idx.lHip);
-  line(idx.rShoulder, idx.rHip);
-  // Mãos esquerdas
-  line(idx.lWrist, idx.lPinky);
-  line(idx.lWrist, idx.lIndex);
-  line(idx.lWrist, idx.lThumb);
-  line(idx.lPinky, idx.lIndex);
-  line(idx.lIndex, idx.lThumb);
-  // Mãos direitas
-  line(idx.rWrist, idx.rPinky);
-  line(idx.rWrist, idx.rIndex);
-  line(idx.rWrist, idx.rThumb);
-  line(idx.rPinky, idx.rIndex);
-  line(idx.rIndex, idx.rThumb);
+
+  function drawJointGlow(idx) {
+    const p = landmarks[idx];
+    if (!p) return;
+    const x = p.x * w;
+    const y = p.y * h;
+
+    ctx.save();
+    const halo = ctx.createRadialGradient(x, y, 0, x, y, jointRadius);
+    halo.addColorStop(0, colors.jointHalo);
+    halo.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(x, y, jointRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowColor = colors.glow;
+    ctx.shadowBlur = baseThickness;
+    ctx.fillStyle = colors.jointCore;
+    ctx.beginPath();
+    ctx.arc(x, y, jointCoreRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  for (const [a, b] of bones) {
+    drawBoneCapsule(a, b);
+  }
+
+  for (const idx of joints) {
+    drawJointGlow(idx);
+  }
+
   ctx.restore();
 }
 
