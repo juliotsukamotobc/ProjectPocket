@@ -11,7 +11,11 @@ const angleLabels = {
   leftShoulder: 'Ombro esquerdo',
   rightShoulder: 'Ombro direito',
   leftHip: 'Quadril esquerdo',
-  rightHip: 'Quadril direito'
+  rightHip: 'Quadril direito',
+  leftWrist: 'Pulso esquerdo',
+  rightWrist: 'Pulso direito',
+  leftAnkle: 'Tornozelo esquerdo',
+  rightAnkle: 'Tornozelo direito'
 };
 
 export function showAngles(angles) {
