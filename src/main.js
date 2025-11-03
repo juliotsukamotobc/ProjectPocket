@@ -1,5 +1,5 @@
 // main.js - app glue
-import { PoseEngine, drawPose, computeAngles } from './pose.js';
+import { PoseEngine, drawPose, computeAngles, drawAngleDifferences } from './pose.js';
 import { MovingAverage } from './smoothing.js';
 import { log, showAngles, downloadJSON } from './ui.js';
 
@@ -14,9 +14,42 @@ const btnExport = document.getElementById('btnExport');
 const btnImport = document.getElementById('btnImport');
 const btnCompare = document.getElementById('btnCompare');
 const btnStopCompare = document.getElementById('btnStopCompare');
+const btnStopCam = document.getElementById('btnStopCam');
 const fileImport = document.getElementById('fileImport');
 const smoothWindow = document.getElementById('smoothWindow');
 const lineWidth = document.getElementById('lineWidth');
+
+function poseThickness() {
+  const raw = parseInt(lineWidth.value, 10);
+  if (!Number.isFinite(raw)) return 6;
+  return Math.max(3, Math.round(raw * 1.6));
+}
+
+function poseStyle(base) {
+  const thickness = poseThickness();
+  if (base === 'overlay') {
+    return {
+      thickness: Math.max(2, thickness - 1),
+      colors: {
+        start: 'rgba(52,152,219,0.95)',
+        end: 'rgba(52,152,219,0.25)',
+        glow: 'rgba(52,152,219,0.45)',
+        jointHalo: 'rgba(52,152,219,0.35)',
+        jointCore: '#f0f6ff'
+      }
+    };
+  }
+  return {
+    thickness,
+    colors: {
+      start: 'rgba(46,204,113,0.95)',
+      end: 'rgba(46,204,113,0.25)',
+      glow: 'rgba(46,204,113,0.55)',
+      jointHalo: 'rgba(46,204,113,0.4)',
+      jointCore: '#f6fff9'
+    }
+  };
+}
 
 let role = "instructor";
 let running = false;
@@ -31,6 +64,7 @@ let compareActive = false;
 let compareStartTime = 0;
 let compareIndex = 0;
 const COMPARE_FPS = 30;
+let lastDiffLogTime = 0;
 
 btnCompare.disabled = true;
 btnStopCompare.disabled = true;
@@ -85,12 +119,39 @@ btnStartCam.addEventListener('click', async ()=>{
     resizeCanvas();
     running = true;
     requestAnimationFrame(loop);
+    btnStartCam.disabled = true;
+    if (btnStopCam) btnStopCam.disabled = false;
     log('Câmera iniciada');
   } catch (e) {
     console.error(e);
     log('Erro da câmera: ' + e.message);
   }
 });
+
+if (btnStopCam) {
+  btnStopCam.addEventListener('click', ()=>{
+    stopCamera();
+  });
+}
+
+function stopCamera() {
+  if (!running && !video.srcObject) {
+    return;
+  }
+  const stream = video.srcObject;
+  if (stream && typeof stream.getTracks === 'function') {
+    stream.getTracks().forEach(track => track.stop());
+  }
+  video.srcObject = null;
+  running = false;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  smoother.reset();
+  stopRecording(true);
+  stopComparison(true);
+  btnStartCam.disabled = false;
+  if (btnStopCam) btnStopCam.disabled = true;
+  log('Câmera parada');
+}
 
 window.addEventListener('resize', resizeCanvas);
 function resizeCanvas() {
@@ -164,6 +225,7 @@ function startComparison() {
   compareActive = true;
   compareStartTime = performance.now();
   compareIndex = 0;
+  lastDiffLogTime = 0;
   ensureInstructorAngles();
   log('Comparação iniciada usando a última gravação do instrutor.');
   updateComparisonButtons();
@@ -174,6 +236,7 @@ function stopComparison(manual = false) {
   compareActive = false;
   compareIndex = 0;
   compareStartTime = 0;
+  lastDiffLogTime = 0;
   if (manual) {
     log('Comparação parada.');
   }
@@ -257,27 +320,51 @@ function loop() {
   const landmarks = smoother.push(landmarksRaw) || landmarksRaw;
   const now = performance.now();
 
+  const ang = computeAngles(landmarks);
+
   // draw
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawPose(ctx, landmarks, {
-    lineWidth: parseInt(lineWidth.value, 10),
-    strokeStyle: "rgba(46,204,113,0.95)",
-    fillStyle: "rgba(46,204,113,0.95)"
-  });
+  drawPose(ctx, landmarks, poseStyle('active'));
   if (compareActive && instructorFrames.length > 0) {
     advanceComparisonFrame();
   }
   const overlayFrame = getInstructorFrameForDisplay();
   if (overlayFrame) {
-    drawPose(ctx, overlayFrame, {
-      lineWidth: parseInt(lineWidth.value, 10),
-      strokeStyle: "rgba(30,144,255,0.9)",
-      fillStyle: "rgba(30,144,255,0.9)"
+    drawPose(ctx, overlayFrame, poseStyle('overlay'));
+  }
+
+  let currentDiffs = null;
+  if (compareActive && ang) {
+    const refAngles = getInstructorAnglesForComparison();
+    if (refAngles) {
+      currentDiffs = {};
+      const keys = new Set([...Object.keys(refAngles || {}), ...Object.keys(ang || {})]);
+      for (const key of keys) {
+        const refValue = refAngles[key];
+        const studentValue = ang[key];
+        if (Number.isFinite(refValue) && Number.isFinite(studentValue)) {
+          currentDiffs[key] = studentValue - refValue;
+        }
+      }
+      if (Object.keys(currentDiffs).length === 0) {
+        currentDiffs = null;
+      }
+    }
+  }
+
+  const hasReference = !!overlayFrame;
+  if (compareActive && hasReference) {
+    drawAngleDifferences(ctx, landmarks, currentDiffs || {}, {
+      referenceLandmarks: overlayFrame,
+      minVisibleDiff: 4,
+      minVisibleDistance: 0.02,
+      maxDistanceNorm: 0.18,
+      maxDiff: 70,
+      showLabels: true
     });
   }
 
   // angles + diff
-  const ang = computeAngles(landmarks);
   showAngles(ang);
 
   if (recording && role === "instructor" && landmarks) {
@@ -295,13 +382,17 @@ function loop() {
 
   // diff display em loop quando comparação estiver ativa
   if (compareActive && role === "student" && ang) {
-    const ref = getInstructorAnglesForComparison();
-    if (ref) {
-      const keys = Object.keys(ang);
-      const diffs = keys.map(k => Math.abs((ang[k]||0) - (ref[k]||0)));
-      const avgDiff = diffs.reduce((a,b)=>a+b,0)/diffs.length;
+    const diffValues = currentDiffs
+      ? Object.values(currentDiffs).map(v => Math.abs(v)).filter(Number.isFinite)
+      : null;
+    if (diffValues && diffValues.length > 0) {
+      const avgDiff = diffValues.reduce((a, b) => a + b, 0) / diffValues.length;
       if (Number.isFinite(avgDiff)) {
-        log(`Diferença média (quadro ${compareIndex + 1}/${instructorFrames.length}): ${avgDiff.toFixed(1)}°`);
+        const nowTs = performance.now();
+        if (nowTs - lastDiffLogTime > 750) {
+          log(`Diferença média (quadro ${compareIndex + 1}/${instructorFrames.length}): ${avgDiff.toFixed(1)}°`);
+          lastDiffLogTime = nowTs;
+        }
       }
     }
   }
