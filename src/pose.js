@@ -142,8 +142,8 @@ export function drawPose(ctx, landmarks, style = {}) {
   ctx.restore();
 }
 
-export function drawAngleDifferences(ctx, landmarks, angleDiffs, options = {}) {
-  if (!ctx || !landmarks || !angleDiffs) return;
+export function drawAngleDifferences(ctx, landmarks, angleDiffs = {}, options = {}) {
+  if (!ctx || !landmarks) return;
 
   const mapping = {
     leftElbow: 13,
@@ -158,39 +158,74 @@ export function drawAngleDifferences(ctx, landmarks, angleDiffs, options = {}) {
 
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
+  const reference = options.referenceLandmarks || null;
   const minVisibleDiff = options.minVisibleDiff ?? 5;
   const maxDiff = options.maxDiff ?? 60;
   const minRadius = options.minRadius ?? 24;
-  const maxRadius = options.maxRadius ?? 80;
+  const maxRadius = options.maxRadius ?? 90;
   const ringWidth = options.ringWidth ?? 3;
   const baseRgb = options.baseRgb ?? '231,76,60';
   const showLabels = options.showLabels ?? true;
   const fontSize = options.fontSize ?? 12;
   const labelPaddingX = options.labelPaddingX ?? 6;
   const labelPaddingY = options.labelPaddingY ?? 4;
-  const maxAlpha = options.maxAlpha ?? 0.82;
+  const maxAlpha = options.maxAlpha ?? 0.88;
+  const minVisibleDistance = options.minVisibleDistance ?? 0.035;
+  const maxDistanceNorm = options.maxDistanceNorm ?? 0.25;
+  const connectorWidth = options.connectorWidth ?? 2.5;
 
   ctx.save();
   ctx.lineWidth = ringWidth;
   ctx.font = `${options.fontWeight ?? 600} ${fontSize}px "Inter", "Segoe UI", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.globalCompositeOperation = options.compositeOperation ?? 'lighter';
 
   for (const [key, idx] of Object.entries(mapping)) {
+    const studentLandmark = landmarks[idx];
+    const refLandmark = reference ? reference[idx] : null;
+    if (!studentLandmark && !refLandmark) continue;
+
     const diff = angleDiffs[key];
-    if (!Number.isFinite(diff)) continue;
-    const magnitude = Math.abs(diff);
-    if (magnitude < minVisibleDiff) continue;
+    const hasAngle = Number.isFinite(diff);
+    const angleMagnitude = hasAngle ? Math.abs(diff) : 0;
 
-    const landmark = landmarks[idx];
-    if (!landmark) continue;
-    const x = landmark.x * w;
-    const y = landmark.y * h;
+    let distanceNorm = 0;
+    let distancePx = 0;
+    if (studentLandmark && refLandmark) {
+      const dx = studentLandmark.x - refLandmark.x;
+      const dy = studentLandmark.y - refLandmark.y;
+      distanceNorm = Math.hypot(dx, dy);
+      distancePx = Math.hypot(dx * w, dy * h);
+    }
 
-    const t = Math.min(magnitude / maxDiff, 1);
-    const radius = minRadius + (maxRadius - minRadius) * t;
-    const innerAlpha = Math.min(0.28 + 0.42 * t, maxAlpha);
-    const midAlpha = Math.min(0.18 + 0.36 * t, maxAlpha);
+    const showDueToAngle = hasAngle && angleMagnitude >= minVisibleDiff;
+    const showDueToDistance = distanceNorm >= minVisibleDistance;
+    if (!showDueToAngle && !showDueToDistance) continue;
+
+    const intensityAngle = hasAngle ? Math.min(angleMagnitude / maxDiff, 1) : 0;
+    const intensityDistance = Math.min(distanceNorm / maxDistanceNorm, 1);
+    const intensity = Math.max(intensityAngle, intensityDistance);
+
+    const origin = studentLandmark || refLandmark;
+    const x = origin.x * w;
+    const y = origin.y * h;
+
+    const radius = minRadius + (maxRadius - minRadius) * intensity;
+    const innerAlpha = Math.min(0.32 + 0.48 * intensity, maxAlpha);
+    const midAlpha = Math.min(0.2 + 0.4 * intensity, maxAlpha);
+
+    if (studentLandmark && refLandmark) {
+      ctx.save();
+      ctx.globalCompositeOperation = options.connectorComposite ?? 'source-over';
+      ctx.strokeStyle = `rgba(${baseRgb},${0.25 + 0.5 * intensity})`;
+      ctx.lineWidth = connectorWidth;
+      ctx.beginPath();
+      ctx.moveTo(refLandmark.x * w, refLandmark.y * h);
+      ctx.lineTo(studentLandmark.x * w, studentLandmark.y * h);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
     gradient.addColorStop(0, `rgba(${baseRgb},${innerAlpha})`);
@@ -201,13 +236,21 @@ export function drawAngleDifferences(ctx, landmarks, angleDiffs, options = {}) {
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = `rgba(${baseRgb},${0.25 + 0.5 * t})`;
+    ctx.strokeStyle = `rgba(${baseRgb},${0.3 + 0.5 * intensity})`;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.stroke();
 
     if (showLabels) {
-      const label = `${Math.round(magnitude)}°`;
+      const labelParts = [];
+      if (showDueToAngle && hasAngle) {
+        labelParts.push(`${Math.round(angleMagnitude)}°`);
+      }
+      if (showDueToDistance && distancePx > 0) {
+        labelParts.push(`${Math.round(distancePx)}px`);
+      }
+      if (labelParts.length === 0) continue;
+      const label = labelParts.join(' • ');
       const labelWidth = ctx.measureText(label).width + labelPaddingX * 2;
       const labelHeight = fontSize + labelPaddingY * 2;
       const labelOffset = radius + labelHeight + 6;
@@ -216,12 +259,15 @@ export function drawAngleDifferences(ctx, landmarks, angleDiffs, options = {}) {
       const rectY = labelCenterY - labelHeight / 2;
       const radiusRect = Math.min(10, labelHeight / 2);
 
-      ctx.fillStyle = `rgba(${baseRgb},0.9)`;
+      ctx.save();
+      ctx.globalCompositeOperation = options.labelComposite ?? 'source-over';
+      ctx.fillStyle = `rgba(${baseRgb},0.94)`;
       drawRoundedRectPath(ctx, rectX, rectY, labelWidth, labelHeight, radiusRect);
       ctx.fill();
 
       ctx.fillStyle = '#ffffff';
       ctx.fillText(label, x, labelCenterY);
+      ctx.restore();
     }
   }
 

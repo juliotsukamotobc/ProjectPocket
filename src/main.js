@@ -352,9 +352,13 @@ function loop() {
     }
   }
 
-  if (currentDiffs) {
-    drawAngleDifferences(ctx, landmarks, currentDiffs, {
+  const hasReference = !!overlayFrame;
+  if (compareActive && hasReference) {
+    drawAngleDifferences(ctx, landmarks, currentDiffs || {}, {
+      referenceLandmarks: overlayFrame,
       minVisibleDiff: 4,
+      minVisibleDistance: 0.02,
+      maxDistanceNorm: 0.18,
       maxDiff: 70,
       showLabels: true
     });
