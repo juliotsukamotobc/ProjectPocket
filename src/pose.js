@@ -153,7 +153,13 @@ export function drawAngleDifferences(ctx, landmarks, angleDiffs = {}, options = 
     leftShoulder: 11,
     rightShoulder: 12,
     leftHip: 23,
-    rightHip: 24
+    rightHip: 24,
+    leftWrist: 15,
+    rightWrist: 16,
+    leftAnkle: 27,
+    rightAnkle: 28,
+    leftFoot: 31,
+    rightFoot: 32
   };
 
   const w = ctx.canvas.width;
@@ -306,18 +312,31 @@ export function computeAngles(landmarks) {
     lShoulder: 11, rShoulder: 12,
     lElbow: 13, rElbow: 14,
     lWrist: 15, rWrist: 16,
+    lPinky: 17, rPinky: 18,
+    lIndex: 19, rIndex: 20,
+    lThumb: 21, rThumb: 22,
     lHip: 23, rHip: 24,
     lKnee: 25, rKnee: 26,
-    lAnkle: 27, rAnkle: 28
+    lAnkle: 27, rAnkle: 28,
+    lHeel: 29, rHeel: 30,
+    lFoot: 31, rFoot: 32
   };
   const A = {};
-  A.leftElbow = angle3(landmarks[i.lShoulder], landmarks[i.lElbow], landmarks[i.lWrist]);
-  A.rightElbow = angle3(landmarks[i.rShoulder], landmarks[i.rElbow], landmarks[i.rWrist]);
-  A.leftKnee = angle3(landmarks[i.lHip], landmarks[i.lKnee], landmarks[i.lAnkle]);
-  A.rightKnee = angle3(landmarks[i.rHip], landmarks[i.rKnee], landmarks[i.rAnkle]);
-  A.leftShoulder = angle3(landmarks[i.lElbow], landmarks[i.lShoulder], landmarks[i.lHip]);
-  A.rightShoulder = angle3(landmarks[i.rElbow], landmarks[i.rShoulder], landmarks[i.rHip]);
-  A.leftHip = angle3(landmarks[i.lShoulder], landmarks[i.lHip], landmarks[i.lKnee]);
-  A.rightHip = angle3(landmarks[i.rShoulder], landmarks[i.rHip], landmarks[i.rKnee]);
+  const safe = (a, b, c) => {
+    if (!a || !b || !c) return NaN;
+    return angle3(a, b, c);
+  };
+  A.leftElbow = safe(landmarks[i.lShoulder], landmarks[i.lElbow], landmarks[i.lWrist]);
+  A.rightElbow = safe(landmarks[i.rShoulder], landmarks[i.rElbow], landmarks[i.rWrist]);
+  A.leftKnee = safe(landmarks[i.lHip], landmarks[i.lKnee], landmarks[i.lAnkle]);
+  A.rightKnee = safe(landmarks[i.rHip], landmarks[i.rKnee], landmarks[i.rAnkle]);
+  A.leftShoulder = safe(landmarks[i.lElbow], landmarks[i.lShoulder], landmarks[i.lHip]);
+  A.rightShoulder = safe(landmarks[i.rElbow], landmarks[i.rShoulder], landmarks[i.rHip]);
+  A.leftHip = safe(landmarks[i.lShoulder], landmarks[i.lHip], landmarks[i.lKnee]);
+  A.rightHip = safe(landmarks[i.rShoulder], landmarks[i.rHip], landmarks[i.rKnee]);
+  A.leftWrist = safe(landmarks[i.lElbow], landmarks[i.lWrist], landmarks[i.lIndex] || landmarks[i.lThumb] || landmarks[i.lPinky]);
+  A.rightWrist = safe(landmarks[i.rElbow], landmarks[i.rWrist], landmarks[i.rIndex] || landmarks[i.rThumb] || landmarks[i.rPinky]);
+  A.leftAnkle = safe(landmarks[i.lKnee], landmarks[i.lAnkle], landmarks[i.lFoot] || landmarks[i.lHeel]);
+  A.rightAnkle = safe(landmarks[i.rKnee], landmarks[i.rAnkle], landmarks[i.rFoot] || landmarks[i.rHeel]);
   return A;
 }
