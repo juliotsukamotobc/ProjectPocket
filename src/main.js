@@ -15,9 +15,11 @@ const btnImport = document.getElementById('btnImport');
 const btnCompare = document.getElementById('btnCompare');
 const btnStopCompare = document.getElementById('btnStopCompare');
 const btnStopCam = document.getElementById('btnStopCam');
+const btnToggleDiffs = document.getElementById('btnToggleDiffs');
 const fileImport = document.getElementById('fileImport');
 const smoothWindow = document.getElementById('smoothWindow');
 const lineWidth = document.getElementById('lineWidth');
+const diffSize = document.getElementById('diffSize');
 
 function poseThickness() {
   const raw = parseInt(lineWidth.value, 10);
@@ -65,6 +67,8 @@ let compareStartTime = 0;
 let compareIndex = 0;
 const COMPARE_FPS = 30;
 let lastDiffLogTime = 0;
+let diffHalosVisible = true;
+let diffRadiusScale = diffSize ? parseFloat(diffSize.value) || 1 : 1;
 
 btnCompare.disabled = true;
 btnStopCompare.disabled = true;
@@ -108,6 +112,38 @@ smoothWindow.addEventListener('input', ()=> {
 });
 
 lineWidth.addEventListener('input', ()=>{});
+
+function updateDiffToggleLabel() {
+  if (!btnToggleDiffs) return;
+  btnToggleDiffs.textContent = diffHalosVisible
+    ? 'Ocultar bolas vermelhas'
+    : 'Mostrar bolas vermelhas';
+}
+
+function updateDiffRadiusScale() {
+  if (!diffSize) {
+    diffRadiusScale = 1;
+    return;
+  }
+  const raw = parseFloat(diffSize.value);
+  diffRadiusScale = Number.isFinite(raw) ? raw : 1;
+}
+
+if (btnToggleDiffs) {
+  btnToggleDiffs.addEventListener('click', ()=>{
+    diffHalosVisible = !diffHalosVisible;
+    updateDiffToggleLabel();
+  });
+}
+
+if (diffSize) {
+  diffSize.addEventListener('input', ()=>{
+    updateDiffRadiusScale();
+  });
+}
+
+updateDiffToggleLabel();
+updateDiffRadiusScale();
 
 // Camera setup
 btnStartCam.addEventListener('click', async ()=>{
@@ -353,14 +389,17 @@ function loop() {
   }
 
   const hasReference = !!overlayFrame;
-  if (compareActive && hasReference) {
+  if (compareActive && hasReference && diffHalosVisible) {
+    const radiusScale = Math.max(0.1, diffRadiusScale);
     drawAngleDifferences(ctx, landmarks, currentDiffs || {}, {
       referenceLandmarks: overlayFrame,
       minVisibleDiff: 4,
       minVisibleDistance: 0.02,
       maxDistanceNorm: 0.18,
       maxDiff: 70,
-      showLabels: true
+      showLabels: true,
+      minRadius: 24 * radiusScale,
+      maxRadius: 90 * radiusScale
     });
   }
 
