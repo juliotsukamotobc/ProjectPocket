@@ -57,7 +57,10 @@ let role = "instructor";
 let running = false;
 let recording = false;
 let recordingStartTime = null;
+let countdownActive = false;
+let countdownStartTime = 0;
 const RECORD_DURATION_MS = 4000;
+const RECORD_COUNTDOWN_MS = 3000;
 let instructorFrames = []; // array de landmarks do instrutor (para referência)
 let instructorAngles = []; // ângulos por frame (auxiliar)
 let poseEngine;
@@ -220,9 +223,19 @@ btnStopCompare.addEventListener('click', ()=>{
   stopComparison(true);
 });
 
-function startRecording() {
+function startRecordingCountdown() {
+  countdownActive = true;
+  countdownStartTime = performance.now();
+  btnRecord.disabled = true;
+  btnStop.disabled = false;
+  btnExport.disabled = true;
+  hideRecordingTimer();
+  log(`Gravação iniciará em ${RECORD_COUNTDOWN_MS / 1000} segundos...`);
+}
+
+function beginRecording(now) {
   recording = true;
-  recordingStartTime = performance.now();
+  recordingStartTime = now;
   instructorFrames = [];
   instructorAngles = [];
   compareActive = false;
@@ -236,7 +249,21 @@ function startRecording() {
   log(`Gravação iniciada (máx ${RECORD_DURATION_MS / 1000}s)`);
 }
 
+function startRecording() {
+  if (countdownActive || recording) return;
+  startRecordingCountdown();
+}
+
 function stopRecording(manual = false) {
+  if (countdownActive && manual) {
+    countdownActive = false;
+    btnRecord.disabled = false;
+    btnStop.disabled = true;
+    btnExport.disabled = instructorFrames.length === 0;
+    hideRecordingTimer();
+    log('Contagem regressiva cancelada.');
+    return;
+  }
   if (!recording) return;
   recording = false;
   recordingStartTime = null;
@@ -356,6 +383,14 @@ function loop() {
   const landmarks = smoother.push(landmarksRaw) || landmarksRaw;
   const now = performance.now();
 
+  if (countdownActive) {
+    const elapsedCountdown = now - countdownStartTime;
+    if (elapsedCountdown >= RECORD_COUNTDOWN_MS) {
+      countdownActive = false;
+      beginRecording(now);
+    }
+  }
+
   const ang = computeAngles(landmarks);
 
   // draw
@@ -419,6 +454,10 @@ function loop() {
     stopRecording(false);
   }
 
+  if (countdownActive) {
+    drawCountdownOverlay(Math.max(0, RECORD_COUNTDOWN_MS - (now - countdownStartTime)));
+  }
+
   // diff display em loop quando comparação estiver ativa
   if (compareActive && role === "student" && ang) {
     const diffValues = currentDiffs
@@ -437,4 +476,25 @@ function loop() {
   }
 
   requestAnimationFrame(loop);
+}
+
+function drawCountdownOverlay(remainingMs) {
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const displayNumber = Math.max(1, totalSeconds);
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  const radius = Math.max(Math.min(canvas.width, canvas.height) / 5, 48);
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.font = `bold ${Math.round(radius * 0.8)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(displayNumber.toString(), centerX, centerY);
+  ctx.restore();
 }
