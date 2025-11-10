@@ -17,13 +17,11 @@
       <div class="controls">
         <button id="btnStartCam">Iniciar câmera</button>
         <button id="btnStopCam" disabled>Parar câmera</button>
-        <label><input type="radio" name="role" value="instructor" checked> Instrutor</label>
-        <label><input type="radio" name="role" value="student"> Aluno</label>
         <button id="btnRecord">Gravar</button>
         <button id="btnStop" disabled>Parar</button>
         <button id="btnExport" disabled>Exportar</button>
         <input id="fileImport" type="file" accept="application/json" hidden />
-        <button id="btnImport">Carregar</button>
+        <button id="btnImport">Importar</button>
         <button id="btnCompare" disabled>Iniciar comparação</button>
         <button id="btnStopCompare" disabled>Parar comparação</button>
         <button id="btnToggleDiffs">Ocultar bolas vermelhas</button>
@@ -57,12 +55,6 @@
       </div>
     </section>
 
-    <section class="panel">
-      <h2>Status</h2>
-      <pre id="log"></pre>
-      <h2>Ângulos (graus)</h2>
-      <div id="angles"></div>
-    </section>
   </main>
 
   <footer>
