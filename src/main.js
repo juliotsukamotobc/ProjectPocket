@@ -63,6 +63,7 @@ const RECORD_DURATION_MS = 4000;
 const RECORD_COUNTDOWN_MS = 3000;
 let instructorFrames = []; // array de landmarks do instrutor (para referência)
 let instructorAngles = []; // ângulos por frame (auxiliar)
+let instructorFrameTimes = []; // timestamps relativos da gravação (ms)
 let poseEngine;
 let smoother = new MovingAverage(parseInt(smoothWindow.value,10));
 let compareActive = false;
@@ -238,6 +239,7 @@ function beginRecording(now) {
   recordingStartTime = now;
   instructorFrames = [];
   instructorAngles = [];
+  instructorFrameTimes = [];
   compareActive = false;
   compareIndex = 0;
   compareStartTime = 0;
@@ -290,6 +292,7 @@ function startComparison() {
   compareIndex = 0;
   lastDiffLogTime = 0;
   ensureInstructorAngles();
+  ensureInstructorFrameTimes();
   log('Comparação iniciada usando a última gravação do instrutor.');
   updateComparisonButtons();
 }
@@ -307,7 +310,13 @@ function stopComparison(manual = false) {
 }
 
 btnExport.addEventListener('click', ()=>{
-  const payload = { frames: instructorFrames, angles: instructorAngles, fps: 30, createdAt: new Date().toISOString() };
+  const payload = {
+    frames: instructorFrames,
+    angles: instructorAngles,
+    frameTimes: instructorFrameTimes,
+    fps: Math.round(estimateRecordedFps()),
+    createdAt: new Date().toISOString()
+  };
   downloadJSON(payload);
 });
 
@@ -321,8 +330,12 @@ fileImport.addEventListener('change', async (e)=>{
     if (!data.frames) throw new Error('Arquivo inválido');
     instructorFrames = data.frames;
     instructorAngles = data.angles || [];
+    instructorFrameTimes = Array.isArray(data.frameTimes) ? data.frameTimes : [];
     if (!Array.isArray(instructorAngles) || instructorAngles.length === 0) {
       instructorAngles = instructorFrames.map(frame => computeAngles(frame));
+    }
+    if (instructorFrameTimes.length !== instructorFrames.length) {
+      instructorFrameTimes = generateFallbackFrameTimes(instructorFrames.length, data.fps);
     }
     compareActive = false;
     compareIndex = 0;
@@ -351,9 +364,81 @@ function ensureInstructorAngles() {
   }
 }
 
+function ensureInstructorFrameTimes() {
+  if (instructorFrames.length === 0) {
+    instructorFrameTimes = [];
+    return;
+  }
+  if (!Array.isArray(instructorFrameTimes) || instructorFrameTimes.length !== instructorFrames.length) {
+    instructorFrameTimes = generateFallbackFrameTimes(instructorFrames.length);
+  }
+}
+
+function generateFallbackFrameTimes(frameCount, fpsHint = COMPARE_FPS) {
+  if (frameCount <= 0) return [];
+  const fallbackFps = Number.isFinite(fpsHint) && fpsHint > 0 ? fpsHint : COMPARE_FPS;
+  const frameInterval = 1000 / fallbackFps;
+  const times = [];
+  for (let i = 0; i < frameCount; i++) {
+    times.push(Math.round(i * frameInterval));
+  }
+  return times;
+}
+
+function getComparisonDuration() {
+  if (Array.isArray(instructorFrameTimes) && instructorFrameTimes.length >= 2) {
+    const start = instructorFrameTimes[0];
+    const end = instructorFrameTimes[instructorFrameTimes.length - 1];
+    const baseDuration = end - start;
+    if (Number.isFinite(baseDuration) && baseDuration > 0) {
+      const spanCount = Math.max(1, instructorFrameTimes.length - 1);
+      const avgInterval = baseDuration / spanCount;
+      const padding = Number.isFinite(avgInterval) && avgInterval > 0 ? avgInterval : 1000 / COMPARE_FPS;
+      return baseDuration + padding;
+    }
+  }
+  const frameCount = instructorFrames.length;
+  if (frameCount <= 1) {
+    return 1000 / COMPARE_FPS;
+  }
+  return (frameCount - 1) * (1000 / COMPARE_FPS);
+}
+
+function estimateRecordedFps() {
+  if (!Array.isArray(instructorFrameTimes) || instructorFrameTimes.length < 2) {
+    return COMPARE_FPS;
+  }
+  const start = instructorFrameTimes[0];
+  const end = instructorFrameTimes[instructorFrameTimes.length - 1];
+  const duration = end - start;
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return COMPARE_FPS;
+  }
+  const frames = instructorFrameTimes.length - 1;
+  return (frames / duration) * 1000;
+}
+
+function findFrameIndexForTime(targetMs) {
+  if (!Array.isArray(instructorFrameTimes) || instructorFrameTimes.length === 0) {
+    return 0;
+  }
+  let low = 0;
+  let high = instructorFrameTimes.length - 1;
+  while (low < high) {
+    const mid = Math.floor((low + high + 1) / 2);
+    if (instructorFrameTimes[mid] <= targetMs) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return low;
+}
+
 function getInstructorAnglesForComparison() {
   if (instructorFrames.length === 0) return null;
   ensureInstructorAngles();
+  ensureInstructorFrameTimes();
   if (!Array.isArray(instructorAngles) || instructorAngles.length === 0) return null;
   if (compareActive) {
     return instructorAngles[compareIndex % instructorAngles.length];
@@ -366,14 +451,20 @@ function advanceComparisonFrame() {
     compareActive = false;
     return;
   }
-  const frameDuration = 1000 / COMPARE_FPS;
-  const elapsed = performance.now() - compareStartTime;
+  ensureInstructorFrameTimes();
+  const loopDuration = Math.max(getComparisonDuration(), 1000 / COMPARE_FPS);
+  const elapsed = (performance.now() - compareStartTime) % loopDuration;
   const frameCount = instructorFrames.length;
-  if (frameCount === 0 || frameDuration <= 0) {
+  if (frameCount === 0) {
     compareIndex = 0;
     return;
   }
-  compareIndex = Math.floor(elapsed / frameDuration) % frameCount;
+  if (instructorFrameTimes.length === frameCount) {
+    compareIndex = findFrameIndexForTime(elapsed);
+  } else {
+    const frameDuration = loopDuration / frameCount;
+    compareIndex = Math.floor(elapsed / frameDuration) % frameCount;
+  }
 }
 
 // Main loop
@@ -444,6 +535,9 @@ function loop() {
   if (recording && role === "instructor" && landmarks) {
     instructorFrames.push(landmarks);
     instructorAngles.push(ang);
+    if (recordingStartTime) {
+      instructorFrameTimes.push(Math.max(0, Math.round(now - recordingStartTime)));
+    }
   }
 
   if (recording && recordingStartTime) {
