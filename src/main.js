@@ -1,7 +1,7 @@
 // main.js - app glue
 import { PoseEngine, drawPose, computeAngles, drawAngleDifferences } from './pose.js';
 import { MovingAverage } from './smoothing.js';
-import { log, showAngles, downloadJSON } from './ui.js';
+import { log, downloadJSON } from './ui.js';
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('overlay');
@@ -53,7 +53,6 @@ function poseStyle(base) {
   };
 }
 
-let role = "instructor";
 let running = false;
 let recording = false;
 let recordingStartTime = null;
@@ -105,11 +104,6 @@ function updateRecordingTimer(now) {
   const elapsed = Math.min(now - recordingStartTime, RECORD_DURATION_MS);
   recordingTimer.textContent = formatDuration(elapsed);
 }
-
-// Role selector
-document.querySelectorAll('input[name="role"]').forEach(r=>{
-  r.addEventListener('change', (e)=> role = e.target.value);
-});
 
 smoothWindow.addEventListener('input', ()=> {
   smoother.setWindowSize(parseInt(smoothWindow.value,10));
@@ -529,10 +523,7 @@ function loop() {
     });
   }
 
-  // angles + diff
-  showAngles(ang);
-
-  if (recording && role === "instructor" && landmarks) {
+  if (recording && landmarks) {
     instructorFrames.push(landmarks);
     instructorAngles.push(ang);
     if (recordingStartTime) {
@@ -553,7 +544,7 @@ function loop() {
   }
 
   // diff display em loop quando comparação estiver ativa
-  if (compareActive && role === "student" && ang) {
+  if (compareActive && ang) {
     const diffValues = currentDiffs
       ? Object.values(currentDiffs).map(v => Math.abs(v)).filter(Number.isFinite)
       : null;
